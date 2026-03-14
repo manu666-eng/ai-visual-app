@@ -1,5 +1,3 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
 # dependencies
 node_modules/
 
@@ -28,15 +26,21 @@ yarn-error.*
 
 # macOS
 .DS_Store
+Thumbs.db
 *.pem
 
-# local env files
+# environment files
+.env
+.env.local
+.env.*
 .env*.local
 
 # typescript
 *.tsbuildinfo
 
-app-example
+# logs
+logs
+*.log
 
 # generated native folders
 /ios

@@ -1,6 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from "react-native";
+
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Linking
+} from "react-native";
+
 import { CameraView, useCameraPermissions } from "expo-camera";
+
 import * as Speech from "expo-speech";
 import * as Location from "expo-location";
 
@@ -8,50 +17,53 @@ export default function HomeScreen() {
 
   const cameraRef = useRef<CameraView | null>(null);
 
-  const [permission, requestPermission] = useCameraPermissions();
-  const [result, setResult] = useState("AI Navigation Starting...");
+  const [permission, requestPermission] =
+    useCameraPermissions();
 
-  const processingRef = useRef(false);
-  const lastMessageRef = useRef("");
+  const [message, setMessage] =
+    useState("AI Navigation starting...");
 
-const SERVER_URL =
-"https://ai-visual-assistant-backend.vercel.app/api/analyze-image";
+  const processingRef = useRef<boolean>(false);
 
-  // SOS FUNCTION
+  const lastSpeech = useRef<string>("");
+
+  const intervalRef =
+    useRef<NodeJS.Timeout | null>(null);
+
+  const SERVER_URL =
+    "https://ai-visual-assistant-backend.vercel.app/api/analyze-image";
+
+
   const sendSOS = async () => {
 
     try {
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } =
+        await Location.requestForegroundPermissionsAsync();
 
       if (status !== "granted") {
-        alert("Location permission denied");
+
+        Speech.speak("Location permission denied");
+
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      const location =
+        await Location.getCurrentPositionAsync({});
 
-      const latitude = location.coords.latitude;
-      const longitude = location.coords.longitude;
+      const link =
+        `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
 
-      const mapsLink =
-        `https://maps.google.com/?q=${latitude},${longitude}`;
+      const sms =
+        `sms:9876543210?body=${encodeURIComponent("Emergency! My location: " + link)}`;
 
-      const message =
-        `EMERGENCY! I need help.\nMy location:\n${mapsLink}`;
-
-      const phoneNumber = "9876543210"; // change to emergency contact
-
-      const smsURL =
-        `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
-
-      await Linking.openURL(smsURL);
+      await Linking.openURL(sms);
 
       Speech.speak("Emergency message sent");
 
-    } catch (error) {
+    } catch {
 
-      console.log("SOS Error:", error);
+      Speech.speak("Unable to send emergency message");
 
     }
 
@@ -61,69 +73,104 @@ const SERVER_URL =
   useEffect(() => {
 
     if (permission && !permission.granted) {
+
       requestPermission();
+
     }
 
   }, [permission]);
 
 
-  useEffect(() => {
+  const captureAndAnalyze = async () => {
 
-    const detectLoop = async () => {
+    if (!cameraRef.current) return;
 
-      if (!cameraRef.current) return;
-      if (processingRef.current) return;
+    if (processingRef.current) return;
 
-      try {
+    processingRef.current = true;
 
-        processingRef.current = true;
+    try {
 
-        const photo = await cameraRef.current.takePictureAsync({
+      const photo =
+        await cameraRef.current.takePictureAsync({
           base64: true,
-          quality: 0.4,
+          quality: 0.35,
           skipProcessing: true
         });
 
-        const response = await fetch(SERVER_URL, {
+      if (!photo?.base64) {
+
+        processingRef.current = false;
+        return;
+
+      }
+
+      const response =
+        await fetch(SERVER_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify({
             image: photo.base64
           })
         });
 
-        const data = await response.json();
+      if (!response.ok) {
 
-        const message = data.message || "No guidance";
-
-        setResult(message);
-
-        if (message !== lastMessageRef.current) {
-
-          lastMessageRef.current = message;
-
-          Speech.speak(message, {
-            rate: 0.95,
-            pitch: 1,
-            language: "en"
-          });
-
-        }
-
-      } catch (error) {
-
-        console.log("AI error", error);
-        setResult("Connection error");
+        throw new Error("Server error");
 
       }
 
-      processingRef.current = false;
+      const data = await response.json();
+
+      const newMessage =
+        data.message || "No guidance available";
+
+      setMessage(newMessage);
+
+      if (newMessage !== lastSpeech.current) {
+
+        lastSpeech.current = newMessage;
+
+        Speech.stop();
+
+        Speech.speak(newMessage, {
+          rate: 0.9,
+          pitch: 1
+        });
+
+      }
+
+    } catch {
+
+      setMessage("Navigation unavailable");
+
+      Speech.stop();
+
+      Speech.speak("Connection problem");
+
+    }
+
+    processingRef.current = false;
+
+  };
+
+
+  useEffect(() => {
+
+    intervalRef.current =
+      setInterval(captureAndAnalyze, 2200);
+
+    return () => {
+
+      if (intervalRef.current) {
+
+        clearInterval(intervalRef.current);
+
+      }
 
     };
-
-    const interval = setInterval(detectLoop, 1500);
-
-    return () => clearInterval(interval);
 
   }, []);
 
@@ -139,6 +186,7 @@ const SERVER_URL =
     );
 
   }
+
 
   return (
 
@@ -156,12 +204,15 @@ const SERVER_URL =
         </Text>
 
         <Text style={styles.result}>
-          {result}
+          {message}
         </Text>
 
       </View>
 
-      <TouchableOpacity style={styles.sosButton} onPress={sendSOS}>
+      <TouchableOpacity
+        style={styles.sos}
+        onPress={sendSOS}
+      >
         <Text style={styles.sosText}>SOS</Text>
       </TouchableOpacity>
 
@@ -179,55 +230,81 @@ const styles = StyleSheet.create({
   camera: { flex: 1 },
 
   overlay: {
+
     position: "absolute",
+
     bottom: 60,
+
     alignSelf: "center",
+
     backgroundColor: "rgba(0,0,0,0.7)",
+
     padding: 16,
+
     borderRadius: 12,
+
     width: "85%"
+
   },
 
   title: {
+
     color: "white",
+
     fontSize: 18,
+
     fontWeight: "bold",
+
     textAlign: "center"
+
   },
 
   result: {
+
     color: "yellow",
+
     fontSize: 16,
+
     marginTop: 6,
+
     textAlign: "center"
+
   },
 
   center: {
+
     flex: 1,
+
     justifyContent: "center",
+
     alignItems: "center"
+
   },
 
-  sosButton: {
+  sos: {
 
     position: "absolute",
+
     top: 60,
+
     right: 20,
 
     backgroundColor: "red",
 
     paddingVertical: 12,
+
     paddingHorizontal: 18,
 
-    borderRadius: 40,
+    borderRadius: 40
 
-    elevation: 5
   },
 
   sosText: {
 
     color: "white",
+
     fontSize: 16,
+
     fontWeight: "bold"
 
   }
