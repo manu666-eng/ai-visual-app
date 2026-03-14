@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-
 import {
   View,
   Text,
@@ -9,19 +8,18 @@ import {
 } from "react-native";
 
 import { CameraView, useCameraPermissions } from "expo-camera";
-
 import * as Speech from "expo-speech";
 import * as Location from "expo-location";
 
 export default function HomeScreen() {
 
-  const cameraRef = useRef<any>(null);
+  const cameraRef = useRef<CameraView | null>(null);
 
   const [permission, requestPermission] =
     useCameraPermissions();
 
   const [message, setMessage] =
-    useState("AI Navigation starting");
+    useState("AI Navigation starting...");
 
   const processingRef = useRef(false);
 
@@ -29,6 +27,7 @@ export default function HomeScreen() {
 
   const SERVER_URL =
     "https://ai-visual-assistant-backend.vercel.app/api/analyze-image";
+
 
   const sendSOS = async () => {
 
@@ -56,12 +55,14 @@ export default function HomeScreen() {
 
   };
 
+
   useEffect(() => {
 
     if (permission && !permission.granted)
       requestPermission();
 
   }, [permission]);
+
 
   const captureAndAnalyze = async () => {
 
@@ -76,7 +77,8 @@ export default function HomeScreen() {
       const photo =
         await cameraRef.current.takePictureAsync({
           base64: true,
-          quality: 0.4
+          quality: 0.4,
+          skipProcessing: true
         });
 
       const response =
@@ -103,19 +105,28 @@ export default function HomeScreen() {
 
         Speech.stop();
 
-        Speech.speak(newMessage);
+        Speech.speak(newMessage, {
+          rate: 0.9,
+          pitch: 1
+        });
 
       }
 
-    } catch {
+    } catch (error) {
+
+      console.log("Capture error:", error);
 
       setMessage("Connection issue");
 
+    } finally {
+
+      // CRITICAL FIX — always unlock processing
+      processingRef.current = false;
+
     }
 
-    processingRef.current = false;
-
   };
+
 
   useEffect(() => {
 
@@ -125,6 +136,7 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
 
   }, []);
+
 
   if (!permission) return <View />;
 
@@ -137,6 +149,7 @@ export default function HomeScreen() {
     );
 
   }
+
 
   return (
 
@@ -171,6 +184,7 @@ export default function HomeScreen() {
   );
 
 }
+
 
 const styles = StyleSheet.create({
 
