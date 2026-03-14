@@ -15,24 +15,20 @@ import * as Location from "expo-location";
 
 export default function HomeScreen() {
 
-  const cameraRef = useRef<CameraView | null>(null);
+  const cameraRef = useRef<any>(null);
 
   const [permission, requestPermission] =
     useCameraPermissions();
 
   const [message, setMessage] =
-    useState("AI Navigation starting...");
+    useState("AI Navigation starting");
 
-  const processingRef = useRef<boolean>(false);
+  const processingRef = useRef(false);
 
-  const lastSpeech = useRef<string>("");
-
-  const intervalRef =
-    useRef<NodeJS.Timeout | null>(null);
+  const lastSpeech = useRef("");
 
   const SERVER_URL =
     "https://ai-visual-assistant-backend.vercel.app/api/analyze-image";
-
 
   const sendSOS = async () => {
 
@@ -41,12 +37,7 @@ export default function HomeScreen() {
       const { status } =
         await Location.requestForegroundPermissionsAsync();
 
-      if (status !== "granted") {
-
-        Speech.speak("Location permission denied");
-
-        return;
-      }
+      if (status !== "granted") return;
 
       const location =
         await Location.getCurrentPositionAsync({});
@@ -61,25 +52,16 @@ export default function HomeScreen() {
 
       Speech.speak("Emergency message sent");
 
-    } catch {
-
-      Speech.speak("Unable to send emergency message");
-
-    }
+    } catch {}
 
   };
 
-
   useEffect(() => {
 
-    if (permission && !permission.granted) {
-
+    if (permission && !permission.granted)
       requestPermission();
 
-    }
-
   }, [permission]);
-
 
   const captureAndAnalyze = async () => {
 
@@ -94,16 +76,8 @@ export default function HomeScreen() {
       const photo =
         await cameraRef.current.takePictureAsync({
           base64: true,
-          quality: 0.35,
-          skipProcessing: true
+          quality: 0.4
         });
-
-      if (!photo?.base64) {
-
-        processingRef.current = false;
-        return;
-
-      }
 
       const response =
         await fetch(SERVER_URL, {
@@ -116,16 +90,10 @@ export default function HomeScreen() {
           })
         });
 
-      if (!response.ok) {
-
-        throw new Error("Server error");
-
-      }
-
       const data = await response.json();
 
       const newMessage =
-        data.message || "No guidance available";
+        data.message || "No guidance";
 
       setMessage(newMessage);
 
@@ -135,20 +103,13 @@ export default function HomeScreen() {
 
         Speech.stop();
 
-        Speech.speak(newMessage, {
-          rate: 0.9,
-          pitch: 1
-        });
+        Speech.speak(newMessage);
 
       }
 
     } catch {
 
-      setMessage("Navigation unavailable");
-
-      Speech.stop();
-
-      Speech.speak("Connection problem");
+      setMessage("Connection issue");
 
     }
 
@@ -156,24 +117,14 @@ export default function HomeScreen() {
 
   };
 
-
   useEffect(() => {
 
-    intervalRef.current =
-      setInterval(captureAndAnalyze, 2200);
+    const interval =
+      setInterval(captureAndAnalyze, 2000);
 
-    return () => {
-
-      if (intervalRef.current) {
-
-        clearInterval(intervalRef.current);
-
-      }
-
-    };
+    return () => clearInterval(interval);
 
   }, []);
-
 
   if (!permission) return <View />;
 
@@ -186,7 +137,6 @@ export default function HomeScreen() {
     );
 
   }
-
 
   return (
 
@@ -222,7 +172,6 @@ export default function HomeScreen() {
 
 }
 
-
 const styles = StyleSheet.create({
 
   container: { flex: 1 },
@@ -232,7 +181,6 @@ const styles = StyleSheet.create({
   overlay: {
 
     position: "absolute",
-
     bottom: 60,
 
     alignSelf: "center",
@@ -244,7 +192,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
 
     width: "85%"
-
   },
 
   title: {
