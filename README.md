@@ -115,6 +115,13 @@ https://ai-visual-assistant-backend.vercel.app
 - Smart glasses integration
 
 ---
+## Application Screenshots
+
+### AI Navigation Starting
+![AI Start](app-start.png)
+
+### Object Detection Result
+![Detection Result](person-detection.png)
 
 ## Author
 
